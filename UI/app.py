@@ -11,6 +11,8 @@ import glob
 import cv2
 import sys
 from segment_anything import sam_model_registry, SamPredictor
+from typing import List
+import re
 
 # TODO:
 # - shortcuts to send to back / from
@@ -21,7 +23,8 @@ class CollageApp(pyglet.window.Window):
         image_path: str = "data/lizards.jpg",
         output_folder="output",
         show_help_on_launch: bool = True,
-        additional_images: list[str] = [],
+        additional_images: List[str] = []
+        # additional_images: list[str] = [],
     ):
         self.rgb_sprites_batch = pyglet.graphics.Batch()
         self.xy_sprites_batch = pyglet.graphics.Batch()
@@ -195,19 +198,52 @@ class CollageApp(pyglet.window.Window):
 
     def _save(self, init=False):
         self.clear_clicks()
-        imname = self.filename.with_suffix("").name + '*'
-        rgb_path = (self.output_folder / imname).with_suffix(f".png")
-        if init:
-            suffix=f'_og'
-        else:
-            suffix=f'__edit__{self.save_counter:03d}'
-        imname = self.filename.with_suffix("").name + suffix
-        rgb_path = (self.output_folder / imname).with_suffix(f".png")
-        xy_path = (self.output_folder / (imname + f"_correspondences")).with_suffix(
-            ".tif"
-        )
+        # imname = self.filename.with_suffix("").name + '*'
+        # rgb_path = (self.output_folder / imname).with_suffix(f".png")
+        # if init:
+        #     suffix=f'_og'
+        # else:
+        #     suffix=f'__edit__{self.save_counter:03d}'
+        # imname = self.filename.with_suffix("").name + suffix
+        # rgb_path = (self.output_folder / imname).with_suffix(f".png")
+        # # xy_path = (self.output_folder / (imname + f"_correspondences")).with_suffix(
+        # #     ".tif"
+        # # )
 
-        print(f"Saving image: {rgb_path}, and correspondences: {xy_path}")
+        # # print(f"Saving image: {rgb_path}, and correspondences: {xy_path}")
+
+        # 定义图片的基础名称
+        imname_base = self.filename.with_suffix("").name
+        if init:
+            suffix = '_og'
+        else:
+            suffix = '__edit'
+        
+        # 定义文件名的模式，用正则表达式匹配同类型文件的序号
+        pattern = re.compile(rf"{imname_base}{suffix}__(\d{{3}})\.png")
+
+        # 获取目标文件夹中的所有文件
+        existing_files = list(self.output_folder.glob(f"{imname_base}{suffix}__*.png"))
+
+        # 初始化最大的序号为0
+        max_counter = 0
+
+        # 遍历文件，查找最大序号
+        for file in existing_files:
+            match = pattern.search(file.name)
+            if match:
+                # 提取并更新当前最大的序号
+                file_counter = int(match.group(1))
+                max_counter = max(max_counter, file_counter)
+
+        # 新的保存计数器应该是现有最大序号加1
+        self.save_counter = max_counter + 1
+
+        # 生成新文件名
+        imname = f"{imname_base}{suffix}__{self.save_counter:03d}"
+        rgb_path = (self.output_folder / imname).with_suffix(f".png")
+
+        print(f"Saving image: {rgb_path}")
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
@@ -248,7 +284,7 @@ class CollageApp(pyglet.window.Window):
             xy.ctypes.data_as(POINTER(GLuint)),
         )
         xy = np.flipud(xy)
-        imageio.imsave(xy_path, float2uint16(xy))
+        # imageio.imsave(xy_path, float2uint16(xy))
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         
@@ -304,6 +340,48 @@ class CollageApp(pyglet.window.Window):
                     
         elif symbol == pyglet.window.key.S:
             self._save()
+        # --------------
+        elif symbol == pyglet.window.key.Q:
+            # scale = 1.0 + dy * 0.01
+            scale = 1.0 + 0.1
+            scale = max(scale, 0.1)
+            self.hovered_sprite.scale_x(scale)
+        elif symbol == pyglet.window.key.W:
+            # scale = 1.0 + dy * 0.01
+            scale = 1.0 - 0.1
+            scale = max(scale, 0.1)
+            self.hovered_sprite.scale_x(scale)
+        elif symbol == pyglet.window.key._1:
+            # scale = 1.0 + dy * 0.01
+            scale = 1.0 + 0.1
+            scale = max(scale, 0.1)
+            self.hovered_sprite.scale_y(scale)
+        elif symbol == pyglet.window.key._2:
+            # scale = 1.0 + dy * 0.01
+            scale = 1.0 - 0.1
+            scale = max(scale, 0.1)
+            self.hovered_sprite.scale_y(scale)
+        elif symbol == pyglet.window.key._3:
+            # scale = 1.0 + dy * 0.01
+            scale = 1.0 + 0.1
+            scale = max(scale, 0.1)
+            self.hovered_sprite.scale(scale)
+        elif symbol == pyglet.window.key._4:
+            # scale = 1.0 + dy * 0.01
+            scale = 1.0 - 0.1
+            scale = max(scale, 0.1)
+            self.hovered_sprite.scale(scale)
+        elif symbol == pyglet.window.key._5:
+            # scale = 1.0 + dy * 0.01
+            # scale = 1.0 + 0.1
+            # scale = max(scale, 0.1)
+            self.hovered_sprite.scale(1.5)
+        elif symbol == pyglet.window.key._6:
+            # scale = 1.0 + dy * 0.01
+            # scale = 1.0 - 0.1
+            # scale = max(scale, 0.1)
+            self.hovered_sprite.scale(0.5)
+        # -----------------------------
         elif symbol == pyglet.window.key.SPACE:
             print("toggling help")
             self.help_group.visible = not self.help_group.visible
@@ -421,18 +499,35 @@ class CollageApp(pyglet.window.Window):
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if self.selected_sprite is None:
             return
-        if modifiers == pyglet.window.key.MOD_COMMAND:
+        # # if modifiers == pyglet.window.key.MOD_COMMAND:
+        # if modifiers == pyglet.window.key.MOD_CTRL:   # my debug for windows
+        #     self.selected_sprite.rotate(dy * 0.5)
+        # elif modifiers == pyglet.window.key.MOD_SHIFT:
+        #     scale = 1.0 + dy * 0.01
+        #     scale = max(scale, 0.1)
+        #     self.selected_sprite.scale(scale)
+        # # elif modifiers == (pyglet.window.key.MOD_SHIFT + pyglet.window.key.MOD_COMMAND):   
+        # elif modifiers == (pyglet.window.key.MOD_SHIFT + pyglet.window.key.MOD_CTRL):   # my debug for windows
+        #     scale = 1.0 + dy * 0.01
+        #     scale = max(scale, 0.1)
+        #     self.selected_sprite.scale_x(scale)
+        # else:
+        #     self.selected_sprite.move(dx, dy)
+
+        if modifiers & pyglet.window.key.MOD_CTRL:
             self.selected_sprite.rotate(dy * 0.5)
-        elif modifiers == pyglet.window.key.MOD_SHIFT:
+        elif modifiers & pyglet.window.key.MOD_SHIFT:
             scale = 1.0 + dy * 0.01
             scale = max(scale, 0.1)
             self.selected_sprite.scale(scale)
-        elif modifiers == (pyglet.window.key.MOD_SHIFT + pyglet.window.key.MOD_COMMAND):
-            scale = 1.0 + dy * 0.01
-            scale = max(scale, 0.1)
-            self.selected_sprite.scale_x(scale)
+        # elif modifiers & pyglet.window.key.TAB:
+        #     scale = 1.0 + dy * 0.01
+        #     scale = max(scale, 0.1)
+        #     self.selected_sprite.scale_x(scale)
         else:
             self.selected_sprite.move(dx, dy)
+        print(modifiers)
+
 
     def on_mouse_motion(self, x, y, dx, dy):
         self._update_hover(x, y)
@@ -730,6 +825,10 @@ class Sprite:
     def scale_x(self, s):
         self.sprite.scale_x *= s
         self.xy_sprite.scale_x *= s
+    # -------------- my debug
+    def scale_y(self, s):
+        self.sprite.scale_y *= s
+        self.xy_sprite.scale_y *= s
 
     def move(self, dx, dy):
         for s in (self.sprite, self.xy_sprite):
