@@ -44,6 +44,7 @@ class CollageApp(pyglet.window.Window):
         print("done.")
 
         self.filename = Path(image_path)
+        output_folder = output_folder + f"/{self.filename.parts[-2]}"    # add scene name
         self.output_folder = Path(output_folder)
         self.output_folder.mkdir(exist_ok=True, parents=True)
         
